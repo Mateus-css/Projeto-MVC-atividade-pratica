@@ -1,6 +1,3 @@
-Express e EJS atualizados em fev/25
+Para adicionar as dependências, use:
 
-1. Para adicionar as dependências, use:
-    ```bash
-    npm install --save
-    ```
+   npm install --save

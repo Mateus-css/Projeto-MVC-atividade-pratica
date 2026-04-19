@@ -1,215 +1,175 @@
 var express = require("express");
 var router = express.Router();
-
-// requisição do Model — uso obrigatório de chaves e nome definido no objeto
+//requisição do Model uso onrigatório de chaves e nome definido no objeto
 const { tarefasModel } = require("../models/tarefasModel");
 const moment = require("moment");
-moment.locale('pt-br');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// express-validator
-// MODELO A: importando com nomes de variáveis em português
-// ─────────────────────────────────────────────────────────────────────────────
-const { body: campo, validationResult: resultadoValidacao } = require("express-validator");
-
-// Regras de validação — usadas nas rotas POST /cadastro
-const regrasValidacaoA = [
-    campo("tarefa")
-        .isLength({ min: 5, max: 45 })
-        .withMessage("O nome da tarefa deve ter entre 5 e 45 caracteres!"),
-    campo("prazo")
-        .isISO8601()
-        .withMessage("O prazo deve ser uma data válida (formato AAAA-MM-DD)!")
-        .bail()
-        .isAfter(new Date(Date.now() - 86400000).toISOString())
-        .withMessage("O prazo não pode ser uma data no passado!"),
-    campo("situacao")
-        .isInt({ min: 0, max: 4 })
-        .withMessage("A situação deve ser um número inteiro entre 0 e 4!")
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MODELO B: importando com nomes de variáveis em inglês (padrão da documentação)
-// A diferença está apenas nos aliases das variáveis importadas;
-// o comportamento é idêntico ao Modelo A.
-// ─────────────────────────────────────────────────────────────────────────────
+moment.locale("pt-br");
 const { body, validationResult } = require("express-validator");
 
-const regrasValidacaoB = [
-    body("tarefa")
-        .isLength({ min: 5, max: 45 })
-        .withMessage("Task name must be between 5 and 45 characters!"),
-    body("prazo")
-        .isISO8601()
-        .withMessage("Deadline must be a valid date (YYYY-MM-DD)!")
-        .bail()
-        .isAfter(new Date(Date.now() - 86400000).toISOString())
-        .withMessage("Deadline cannot be in the past!"),
-    body("situacao")
-        .isInt({ min: 0, max: 4 })
-        .withMessage("Status must be an integer between 0 and 4!")
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ROTAS PRINCIPAIS
-// ─────────────────────────────────────────────────────────────────────────────
-
-// GET / — listagem paginada
 router.get("/", async function (req, res) {
-    res.locals.moment = moment;
-    let paginaAtual = req.query.pagina == undefined ? 1 : req.query.pagina;
-    let qtdePagina = 5;
-    let offset = (paginaAtual - 1) * qtdePagina;
-    let totalPaginas = Math.ceil(await tarefasModel.totRegistros() / qtdePagina);
+  res.locals.moment = moment;
+  //recuperar a página solicitada caso não exista será a página 1
+  let paginaAtual = req.query.pagina == undefined ? 1 : req.query.pagina;
+  //definir a qtde de registros por página
+  let qtdePagina = 5;
+  //definir o offset em relação a pagina atual
+  let offset = (paginaAtual - 1) * qtdePagina;
+  //definir o número de páginas de resultados
+  let totalPaginas = Math.ceil(
+    (await tarefasModel.totRegistros()) / qtdePagina,
+  );
 
-    var paginador = totalPaginas > 1
-        ? { paginaAtual: paginaAtual, totalPaginas: totalPaginas }
-        : null;
+  if (totalPaginas > 1) {
+    var paginador = { paginaAtual: paginaAtual, totalPaginas: totalPaginas };
+  } else {
+    var paginador = null;
+  }
 
-    try {
-        const linhas = await tarefasModel.findAll(offset, qtdePagina);
-        res.render("pages/index", { linhasTabela: linhas, notificador: paginador, erros: [] });
-    } catch (erro) {
-        console.log(erro);
-    }
+  try {
+    const linhas = await tarefasModel.findAll(offset, qtdePagina);
+    res.render("pages/index", { linhasTabela: linhas, notificador: paginador });
+  } catch (erro) {
+    console.log(erro);
+  }
 });
 
-// GET /cadastro — exibe formulário de nova tarefa
 router.get("/cadastro", (req, res) => {
-    res.locals.moment = moment;
-    res.render("pages/cadastro", {
-        tituloAba: "Cadastro de tarefa",
-        tituloPagina: "Nova Tarefa",
-        tarefa: { id_tarefa: 0, nome_tarefa: "", prazo_tarefa: "", situacao_tarefa: 1 },
-        erros: []
-    });
+  res.locals.moment = moment;
+  res.render("pages/cadastro", {
+    tituloAba: "Cadastro de tarefa",
+    tituloPagina: "Nova Tarefa",
+    tarefa: {
+      id_tarefa: 0,
+      nome_tarefa: "",
+      prazo_tarefa: "",
+      situacao_tarefa: 1,
+    },
+  });
 });
 
-// GET /alterar — exibe formulário de edição
 router.get("/alterar", async (req, res) => {
-    res.locals.moment = moment;
-    const id = req.query.id;
-    try {
-        const tarefa = await tarefasModel.findById(id);
-        res.render("pages/cadastro", {
-            tituloAba: "Edição de tarefa",
-            tituloPagina: "Alterar Tarefa",
-            tarefa: tarefa[0],
-            erros: []
-        });
-    } catch (erro) {
-        console.log(erro);
-    }
+  res.locals.moment = moment;
+  //recuperar o id da queryString
+  const id = req.query.id;
+  try {
+    const tarefa = await tarefasModel.findById(id);
+
+    res.render("pages/cadastro", {
+      tituloAba: "Edição de tarefa",
+      tituloPagina: "Alterar Tarefa",
+      tarefa: tarefa[0],
+    });
+  } catch (erro) {
+    console.log(erro);
+  }
 });
 
-// POST /cadastro — salva ou atualiza tarefa COM VALIDAÇÃO (Modelo A — variáveis em português)
-router.post("/cadastro", regrasValidacaoA, async (req, res) => {
-    res.locals.moment = moment;
+router.post(
+  "/cadastro",
+  [
+    body("tarefa")
+      .isLength({ min: 5, max: 45 })
+      .withMessage("A tarefa deve ter entre 5 e 45 caracteres"),
 
-    // Verificar resultado da validação
-    const erros = resultadoValidacao(req);
+    body("prazo")
+      .isDate()
+      .withMessage("Data inválida")
+      .custom((value) => {
+        const hoje = new Date();
+        const data = new Date(value);
+
+        if (data < hoje.setHours(0, 0, 0, 0)) {
+          throw new Error("A data deve ser hoje ou futura");
+        }
+        return true;
+      }),
+
+    body("situacao")
+      .isInt({ min: 0, max: 4 })
+      .withMessage("Situação deve ser entre 0 e 4"),
+  ],
+  async (req, res) => {
+    const erros = validationResult(req);
 
     if (!erros.isEmpty()) {
-        // Há erros: reexibe o formulário com as mensagens
-        const tarefaForm = {
-            id_tarefa:      req.body.id,
-            nome_tarefa:    req.body.tarefa,
-            prazo_tarefa:   req.body.prazo,
-            situacao_tarefa: req.body.situacao
-        };
-        const tituloAba    = req.body.id == 0 ? "Cadastro de tarefa" : "Edição de tarefa";
-        const tituloPagina = req.body.id == 0 ? "Nova Tarefa"        : "Alterar Tarefa";
-
-        return res.render("pages/cadastro", {
-            tituloAba,
-            tituloPagina,
-            tarefa: tarefaForm,
-            erros: erros.array()   // array de objetos { msg, path, ... }
-        });
+      return res.render("pages/cadastro", {
+        tituloAba: "Erro",
+        tituloPagina: "Corrija os erros",
+        tarefa: {
+          id_tarefa: req.body.id,
+          nome_tarefa: req.body.tarefa,
+          prazo_tarefa: req.body.prazo,
+          situacao_tarefa: req.body.situacao,
+        },
+        erros: erros.array(),
+      });
     }
 
-    // Sem erros: persiste os dados
     const objJson = {
-        id:       req.body.id,
-        nome:     req.body.tarefa,
-        prazo:    req.body.prazo,
-        situacao: req.body.situacao
+      id: req.body.id,
+      nome: req.body.tarefa,
+      prazo: req.body.prazo,
+      situacao: req.body.situacao,
     };
 
     try {
-        if (objJson.id == 0) {
-            var result = await tarefasModel.create(objJson);
-        } else {
-            var result = await tarefasModel.update(objJson);
-        }
-        console.log(result);
-        res.redirect("/");
+      if (objJson.id == 0) {
+        await tarefasModel.create(objJson);
+      } else {
+        await tarefasModel.update(objJson);
+      }
+
+      res.redirect("/");
     } catch (erro) {
-        console.log(erro);
+      console.log(erro);
     }
-});
+  },
+);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ROTA DE EXCLUSÃO LÓGICA (soft delete) — chamada pelo link na listagem
-// ─────────────────────────────────────────────────────────────────────────────
-router.get("/excluir", async (req, res) => {
-    const id = req.query.id;
-    try {
-        const result = await tarefasModel.deleteLogico(id);
-        console.log("Exclusão lógica:", result);
-        res.redirect("/");
-    } catch (erro) {
-        console.log(erro);
-    }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ROTAS DE TESTE
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Teste de insert
 router.get("/teste-insert", async (req, res) => {
-    const dadosInsert = {
-        nome:     "instalar o fortnite no Lab 1 Terreo",
-        prazo:    "2026-12-31",
-        situacao: 1
-    };
-    try {
-        const resultInsert = await tarefasModel.create(dadosInsert);
-        res.send(resultInsert);
-    } catch (erro) {
-        console.log(erro);
-    }
+  const dadosInsert = {
+    nome: "instalar o fortnite no Lab 1 Terreo",
+    prazo: "2026-03-19",
+  };
+  try {
+    const resultInsert = await tarefasModel.create(dadosInsert);
+    res.send(resultInsert);
+  } catch (erro) {
+    console.log(erro);
+  }
 });
 
-// Teste de exclusão física (hard delete) — altera o id conforme necessário
+//delete físico - hard delete
 router.get("/teste-delete", async (req, res) => {
-    let idTarefa = req.query.id || 99; // passa ?id=X na URL ou usa 99 como padrão
-    try {
-        const resultDelete = await tarefasModel.deleteFisico(idTarefa);
-        res.send({
-            metodo: "deleteFisico (hard delete)",
-            idExcluido: idTarefa,
-            resultado: resultDelete
-        });
-    } catch (erro) {
-        console.log(erro);
-    }
+  let idTarefa = 17;
+  try {
+    const resultDelete = await tarefasModel.deleteFisico(idTarefa);
+    res.send(resultDelete);
+  } catch (erro) {
+    console.log(erro);
+  }
 });
 
-// Teste de exclusão lógica (soft delete) — altera o id conforme necessário
+//exercicio - teste de update -> delete lógico ou soft delete
+//delete lógico - soft delete
 router.get("/teste-soft-delete", async (req, res) => {
-    let idTarefa = req.query.id || 99; // passa ?id=X na URL ou usa 99 como padrão
-    try {
-        const resultUpdate = await tarefasModel.deleteLogico(idTarefa);
-        res.send({
-            metodo: "deleteLogico (soft delete)",
-            idDesativado: idTarefa,
-            resultado: resultUpdate
-        });
-    } catch (erro) {
-        console.log(erro);
-    }
+  let idTarefa = 15;
+  try {
+    const resultUpdate = await tarefasModel.deleteLogico(idTarefa);
+    res.send(resultUpdate);
+  } catch (erro) {
+    console.log(erro);
+  }
+});
+
+router.get("/excluir-logico/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    await tarefasModel.deleteLogico(id);
+    res.redirect("/");
+  } catch (erro) {
+    console.log(erro);
+  }
 });
 
 module.exports = router;
