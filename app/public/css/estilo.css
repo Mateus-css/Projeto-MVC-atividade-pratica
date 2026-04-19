@@ -1,0 +1,29 @@
+ul{
+    list-style: none;
+}
+
+ul li{
+    display: inline-block;
+}
+ul li a{
+    background-color: lightgray;
+    display: block;
+    width: 40px;
+    height: 40px;
+}
+
+ul li a.atual{
+    background-color: lightskyblue;
+}
+/* Bloco de erros do express-validator */
+.erros {
+    background-color: #fde8e8;
+    border: 1px solid #e74c3c;
+    border-radius: 4px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    color: #c0392b;
+}
+.erros ul {
+    margin: 6px 0 0 16px;
+}
